@@ -7,7 +7,7 @@ Check the requirements.txt
 Paste the Dash local server link into a Browser
 
 
-## Download more recent data or models
-## Update the local paths to the data
-## Override the static Monday string with the date
+#### Download more recent data or models
+#### Update the local paths to the data
+#### Override the static Monday string with the date
 
