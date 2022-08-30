@@ -1,4 +1,4 @@
-# bucky-viz
+# bucky-viz - Bucky Covid19 Forecast Model Explorer
 
 Check the requirements.txt 
 
