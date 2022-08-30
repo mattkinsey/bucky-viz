@@ -1,3 +1,7 @@
+
+print('Bucky Covid19 Forecast Model Explorer')
+print('-------------------')
+    
 from dash import Dash
 from dash import dcc
 from dash import html
@@ -13,178 +17,183 @@ import us
 
 import os
 path = os.getcwd() + '/util/'
-print(path)
+#print(path)
 import sys
 sys.path.append(path)
+
+from pathlib import Path
+home_directory = Path.home()
 
 from analytics_util import *
 from color_setup import *
 
 
-def prepare_data(b_path,r_path, m_str):
+def prepare_data(b_path, r_path, m_str):
 
-    # USE LOCAL PATH to cloned data files
     bucky_data_path = b_path  
     reichlab_data_path = r_path  
     
-    show_paths()
+    # print('bucky_data_path', bucky_data_path)
+    # print('reichlab_data_path', reichlab_data_path)
+    # print('monday_str', m_str)
+    #show_paths()
 
-    # Find locally loaded data folders
-
-    monday_str = m_str #'2022-08-15'  # RUN DATE: override to load known data
+    monday_str = m_str  # RUN DATE: override to accomodate known local data
     
     b_output_files_list = get_most_recent_bucky_output_folders(bucky_data_path, monday_str)
     
     if len(b_output_files_list) == 0:
-        print('Need data path.')
-    
-    # GET ALL CURRENT BUCKY OUTPUT
-    
-    sys.path.append(bucky_data_path)
+        print('No Data Found.')
+        return False, False
+    else:
+        print('Processing...')
+        # GET ALL CURRENT BUCKY OUTPUT
 
-    df_b_out = pd.DataFrame({})
-    df_b_o = pd.DataFrame({})
-    df_b_o_us = pd.DataFrame({})
-    df_b_o_cat = pd.DataFrame({})
+        #sys.path.append(bucky_data_path)
 
-    for i in b_output_files_list:
-        #print(i)
-        df_b_o_us = get_bucky_output_df(bucky_data_path, i)
-        df_b_o = get_bucky_output_1_df(bucky_data_path, i)
-        df_b_o_cat = pd.concat([df_b_o_us, df_b_o], ignore_index=True)
-        df_b_out = pd.concat([df_b_out, df_b_o_cat], ignore_index=True)
-        #print(df_b_out.to_string())
+        df_b_out = pd.DataFrame({})
+        df_b_o = pd.DataFrame({})
+        df_b_o_us = pd.DataFrame({})
+        df_b_o_cat = pd.DataFrame({})
 
-    df_b_out['dt'] = pd.to_datetime(df_b_out['date'], format='%Y-%m-%d')
-    df_b_out = df_b_out[df_b_out['quantile'].isin([-1,.01,.2,.25,.45,.55,.75,.8,.5,.99])]
+        for i in b_output_files_list:
+            #print(i)
+            df_b_o_us = get_bucky_output_df(bucky_data_path, i)
+            df_b_o = get_bucky_output_1_df(bucky_data_path, i)
+            df_b_o_cat = pd.concat([df_b_o_us, df_b_o], ignore_index=True)
+            df_b_out = pd.concat([df_b_out, df_b_o_cat], ignore_index=True)
+            #print(df_b_out.to_string())
 
-    df_b_out['adm1'] = df_b_out['adm1'].astype(float)
-    df_b_out.drop(['adm0'],axis=1, inplace=True)
+        df_b_out['dt'] = pd.to_datetime(df_b_out['date'], format='%Y-%m-%d')
+        df_b_out = df_b_out[df_b_out['quantile'].isin([-1,.01,.2,.25,.45,.55,.75,.8,.5,.99])]
 
-    
-    #b_models.append('Historic')
-    #b_models
+        df_b_out['adm1'] = df_b_out['adm1'].astype(float)
+        df_b_out.drop(['adm0'],axis=1, inplace=True)
 
 
-    # CREATE STATE TEMPLATE CODES
-
-    #print(us.states.STATES)
-    #print(us.states.STATES_AND_TERRITORIES)
-    l = us.states.STATES_AND_TERRITORIES
-
-    s_name=[]
-    s_fips=[]
-    s_abbr=[]
-    for i in l:
-        s_name.append(str(i))
-        s_fips.append(i.fips)
-        s_abbr.append(i.abbr)
-        #print(i, i.abbr, i.fips)
-
-    s_name.insert(0,'United States')
-    s_fips.insert(0,'-1')
-    s_abbr.insert(0,'US')
-
-    df_us = pd.DataFrame({'State':s_name,'adm1':s_fips,'abbr':s_abbr})
-    df_us['adm1'] = df_us['adm1'].astype(float)
-    df_us.sample(3)
+        #b_models.append('Historic')
+        #b_models
 
 
+        # CREATE STATE TEMPLATE CODES
 
-    # GET REICHLAB TRUTH  with State and National Data
+        #print(us.states.STATES)
+        #print(us.states.STATES_AND_TERRITORIES)
+        l = us.states.STATES_AND_TERRITORIES
 
-    def prior_30_date(given_date):  # TAKES datetime.date(YYYY, MM, DD)
-        return given_date - timedelta(30)
+        s_name=[]
+        s_fips=[]
+        s_abbr=[]
+        for i in l:
+            s_name.append(str(i))
+            s_fips.append(i.fips)
+            s_abbr.append(i.abbr)
+            #print(i, i.abbr, i.fips)
 
-    def future_30_date(given_date):  # TAKES datetime.date(YYYY, MM, DD)
-        return given_date + timedelta(30)
+        s_name.insert(0,'United States')
+        s_fips.insert(0,'-1')
+        s_abbr.insert(0,'US')
 
-    # load Data HISTORIC DATA
-
-    sys.path.append(reichlab_data_path)
-
-
-    # load incident truth
-    df_ic = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Cases.csv', low_memory=False)
-    df_id = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Deaths.csv', low_memory=False)
-    df_ih = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Hospitalizations.csv', low_memory=False)
-
-    last_date = df_ic['date'].max() 
-    # I am assuming that all three of these files have the same final date. !!!!
-
-    in_string = str(last_date)
-    f = "%Y-%m-%d"  # YEAR - MONTH - DAY    YYYY-MM-DD
-    in_object = datetime.strptime(in_string, f)
-
-    prior_30 = prior_30_date(in_object)
-    prior_30_str = str(prior_30.date())
-    future_30 = future_30_date(in_object)
-    future_30_str = str(future_30.date())
-
-    l = df_ic['location'].unique()
-    ll = []
-    for i in l:
-        if len(i)<5:
-            ll.append(i)
-
-    df_us_c = df_ic.loc[df_ic['location'].isin(ll)]
-    df_us_d = df_id.loc[df_id['location'].isin(ll)]
-    df_us_h = df_ih.loc[df_ih['location'].isin(ll)]
+        df_us = pd.DataFrame({'State':s_name,'adm1':s_fips,'abbr':s_abbr})
+        df_us['adm1'] = df_us['adm1'].astype(float)
+        df_us.sample(3)
 
 
 
+        # GET REICHLAB TRUTH  with State and National Data
 
-    # 7 day rolling average to smooth weekends
-    df_us_ic = df_us_c.copy()
-    df_us_ic['value'] = df_us_ic['value'].rolling(7).mean()
-    df_us_ic.dropna(how='any', axis=0, inplace=True)
-    df_us_id = df_us_d.copy()
-    df_us_id['value'] = df_us_id['value'].rolling(7).mean()
-    df_us_id.dropna(how='any', axis=0, inplace=True)
-    df_us_ih = df_us_h.copy()
-    df_us_ih['value'] = df_us_ih['value'].rolling(7).mean()
-    df_us_ih.dropna(how='any', axis=0, inplace=True)
+        def prior_30_date(given_date):  # TAKES datetime.date(YYYY, MM, DD)
+            return given_date - timedelta(30)
 
-    # 30 days hist crop
-    df_us_ic_crop = df_us_ic[(df_us_ic['date'] > prior_30_str) & (df_us_ic['date'] <= future_30_str)]
-    df_us_id_crop = df_us_id[(df_us_id['date'] > prior_30_str) & (df_us_id['date'] <= future_30_str)]
-    df_us_ih_crop = df_us_ih[(df_us_ih['date'] > prior_30_str) & (df_us_ih['date'] <= future_30_str)]
+        def future_30_date(given_date):  # TAKES datetime.date(YYYY, MM, DD)
+            return given_date + timedelta(30)
 
-    dups = ['date','location','location_name']
-    df_us_ic_crop.columns = dups + ['daily_reported_cases']
-    df_us_id_crop.columns = dups + ['daily_deaths']
-    df_us_ih_crop.columns = dups + ['daily_hospitalizations']
+        # load Data HISTORIC DATA
 
-    df_us_all = pd.merge(df_us_ih_crop, df_us_ic_crop, how='inner', left_on=dups, right_on=dups)
-    df_us_all = pd.merge(df_us_all, df_us_id_crop, how='inner', left_on=dups, right_on=dups)
-    df_us_all.sort_values(by='date', ascending=False,inplace=True)
-    df_us_all.reset_index(inplace=True)
-    df_us_all['model'] = 'Historic'#+monday_str
-    df_us_all['quantile'] = -1
-    df_us_all['adm1'] = df_us_all['location']
-    df_us_all['State'] = df_us_all['location_name']
-    df_us_all = df_us_all.drop(['location','location_name','index'],axis=1)
+        #sys.path.append(reichlab_data_path)
 
-    df_us_all['dt'] = pd.to_datetime(df_us_all['date'], format='%Y-%m-%d')
-    df_us_all['adm1'].replace('US','-1', inplace=True)  # US --> -1
-    df_us_all['adm1'] = df_us_all['adm1'].astype(float)
-    df_us_all = df_us_all.merge(df_us, how='inner', on=['adm1'])
-    df_us_all.drop(['State_y'], axis='columns', inplace=True)
-    df_us_all.rename(columns = {'State_x':'State'}, inplace = True)
-    
-    
-    df_b_out2 = df_b_out.merge(df_us, left_on=['adm1'], right_on=['adm1'])
 
-    # ADD ReichLab HISTORIC TRUTH
-    df_b_out3 = pd.concat([df_us_all, df_b_out2], axis=0, ignore_index=True)
-    #print(len(df_b_out3))
-    
-    b_models = df_b_out3['model'].unique()
-    b_models = list(b_models)
-    b_models.remove('Historic')
-    b_models.append('Historic')
-    
-    return df_b_out3, b_models
+        # load incident truth
+        df_ic = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Cases.csv', low_memory=False)
+        df_id = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Deaths.csv', low_memory=False)
+        df_ih = pd.read_csv(reichlab_data_path+'data-truth/truth-Incident Hospitalizations.csv', low_memory=False)
+
+        last_date = df_ic['date'].max() 
+        # I am assuming that all three of these files have the same final date. !!!!
+
+        in_string = str(last_date)
+        f = "%Y-%m-%d"  # YEAR - MONTH - DAY    YYYY-MM-DD
+        in_object = datetime.strptime(in_string, f)
+
+        prior_30 = prior_30_date(in_object)
+        prior_30_str = str(prior_30.date())
+        future_30 = future_30_date(in_object)
+        future_30_str = str(future_30.date())
+
+        l = df_ic['location'].unique()
+        ll = []
+        for i in l:
+            if len(i)<5:
+                ll.append(i)
+
+        df_us_c = df_ic.loc[df_ic['location'].isin(ll)]
+        df_us_d = df_id.loc[df_id['location'].isin(ll)]
+        df_us_h = df_ih.loc[df_ih['location'].isin(ll)]
+
+
+
+
+        # 7 day rolling average to smooth weekends
+        df_us_ic = df_us_c.copy()
+        df_us_ic['value'] = df_us_ic['value'].rolling(7).mean()
+        df_us_ic.dropna(how='any', axis=0, inplace=True)
+        df_us_id = df_us_d.copy()
+        df_us_id['value'] = df_us_id['value'].rolling(7).mean()
+        df_us_id.dropna(how='any', axis=0, inplace=True)
+        df_us_ih = df_us_h.copy()
+        df_us_ih['value'] = df_us_ih['value'].rolling(7).mean()
+        df_us_ih.dropna(how='any', axis=0, inplace=True)
+
+        # 30 days hist crop
+        df_us_ic_crop = df_us_ic[(df_us_ic['date'] > prior_30_str) & (df_us_ic['date'] <= future_30_str)]
+        df_us_id_crop = df_us_id[(df_us_id['date'] > prior_30_str) & (df_us_id['date'] <= future_30_str)]
+        df_us_ih_crop = df_us_ih[(df_us_ih['date'] > prior_30_str) & (df_us_ih['date'] <= future_30_str)]
+
+        dups = ['date','location','location_name']
+        df_us_ic_crop.columns = dups + ['daily_reported_cases']
+        df_us_id_crop.columns = dups + ['daily_deaths']
+        df_us_ih_crop.columns = dups + ['daily_hospitalizations']
+
+        df_us_all = pd.merge(df_us_ih_crop, df_us_ic_crop, how='inner', left_on=dups, right_on=dups)
+        df_us_all = pd.merge(df_us_all, df_us_id_crop, how='inner', left_on=dups, right_on=dups)
+        df_us_all.sort_values(by='date', ascending=False,inplace=True)
+        df_us_all.reset_index(inplace=True)
+        df_us_all['model'] = 'Historic'#+monday_str
+        df_us_all['quantile'] = -1
+        df_us_all['adm1'] = df_us_all['location']
+        df_us_all['State'] = df_us_all['location_name']
+        df_us_all = df_us_all.drop(['location','location_name','index'],axis=1)
+
+        df_us_all['dt'] = pd.to_datetime(df_us_all['date'], format='%Y-%m-%d')
+        df_us_all['adm1'].replace('US','-1', inplace=True)  # US --> -1
+        df_us_all['adm1'] = df_us_all['adm1'].astype(float)
+        df_us_all = df_us_all.merge(df_us, how='inner', on=['adm1'])
+        df_us_all.drop(['State_y'], axis='columns', inplace=True)
+        df_us_all.rename(columns = {'State_x':'State'}, inplace = True)
+
+
+        df_b_out2 = df_b_out.merge(df_us, left_on=['adm1'], right_on=['adm1'])
+
+        # ADD ReichLab HISTORIC TRUTH
+        df_b_out3 = pd.concat([df_us_all, df_b_out2], axis=0, ignore_index=True)
+        #print(len(df_b_out3))
+
+        b_models = df_b_out3['model'].unique()
+        b_models = list(b_models)
+        b_models.remove('Historic')
+        b_models.append('Historic')
+
+        return df_b_out3, b_models
 
 
 def get_demo_data():
@@ -434,25 +443,35 @@ def define_dash_server(df, b_models, monday_str):
     
     
     print('Starting Dash Server.')
+    print('<<< CTRL+C to stop server. >>>')
+    print('')
     app.run_server(debug=True, use_reloader=False)
     
     return
 
 
-
 def start_dash():
+    print('')
     print('Model Explorer.')
     print('-----------------')
+    import os
+
+    #desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    bucky_data_path = '/mnt/c/Users/'+str(Path.home()).split('/')[-1]+'/Desktop/python/bucky-output/'
     
-    bucky_data_path = '/mnt/c/Users/smolijm1/Desktop/python/bucky-output/'
-    reichlab_data_path = '/mnt/c/Users/smolijm1/Desktop/python/covid19-forecast-hub/'
-    #monday_str = '2022-08-15'
+    reichlab_data_path = '/mnt/c/Users/'+str(Path.home()).split('/')[-1]+'/Desktop/python/covid19-forecast-hub/'
+    
+    monday_str = '2022-08-15'  # <-- this date should be within the range provided in the Bucky Model output
+                               # Will find the most recent monday if commented out 
     
     df, b_models = prepare_data(bucky_data_path, reichlab_data_path, monday_str)
-    print('Local Data loaded.')
     
-    define_dash_server(df, b_models, monday_str)
     
+    if df.size > 0:
+        print('Local Data loaded.')
+        define_dash_server(df, b_models, monday_str)
+    else:
+        print('end.')
     return
 
 
@@ -469,21 +488,24 @@ def start_dash_demo():
 
 
 if __name__ == '__main__':
-    print('Bucky Model Viewer')
-    print('-------------------')
-    print('1 - Demo data')
-    print('2 - Local data')
-    print('')
-    x = input('Enter an option : ')
-    if x == '1':
-        print('Run Demo.')
-        start_dash_demo()
-    elif x == '2':
-        print('Run Local.')
-        print('Local data paths and RUN DATE may need to be configured in PREPARE_DATA() function.')
-        print('Data preprocess may take a few seconds.')
-        print('CTRL+C twice to stop server.')
-        print('If the data paths have not been set to the Bucky Model Output and Reigh Lab data repositories, use the demo data file.')
+    
+   
+    x = '-1'
+    while x != '1' and x != '2':
         print('')
-        y = input('Enter to Continue.')
-        start_dash()
+        print('1 - Demo data')
+        print('2 - Local data')
+        print('')
+        x = input('Enter an option : ')
+        if x == '1':
+            print('Run Demo.')
+            start_dash_demo()
+        elif x == '2':
+            print('')
+            print('Process Local.')
+            print('Local data paths and RUN DATE may need to be configured in the start_dash() function.')
+            print('Data preprocess may take a few seconds.')
+            print('If the data paths have not been set to the Bucky Model Output and Reigh Lab data repositories, use the Demo data file by choosing option 1.')
+            print('')
+            y = input('Enter to Continue.')
+            start_dash()

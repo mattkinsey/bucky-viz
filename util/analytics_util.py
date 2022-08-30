@@ -7,6 +7,7 @@ from os import path
 from datetime import datetime
 from datetime import timedelta
 
+import sys
 
 arbitrary_run_date = datetime(2022, 7, 12)
 
@@ -72,7 +73,10 @@ def unzip_most_recent_bucky_output_targz_files(path, date_str):
     # unzip
     # return file path list
     import tarfile
-
+    
+    print('targz path',path)
+    print('targz date_str',date_str)
+    
     # get file names
     files_list = []
     for root, directories, files in os.walk(path):
@@ -122,6 +126,7 @@ def get_most_recent_bucky_output_folders(path, date_str):
     # return file path list
     import tarfile
     print('Loading local data...')
+    print('get bucky: ', path, date_str)
     folders_list = []
     for root, directories, files in os.walk(path):
         for d in directories:
