@@ -167,6 +167,51 @@ def get_bucky_output_1_df(data_path, path):
     return df
 
 
+# PLUGIN FOR REICHLAB-BUCKY
+def get_reichlab_bucky_output_df(data_path):
+    import pandas as pd
+
+    #data_path = '/mnt/c/Users/<user>/.../covid19-forecast-hub/data-processed/JHUAPL-Bucky/2022-08-22-JHUAPL-Bucky.csv'
+
+    #print('data_path',data_path)
+    df = pd.read_csv(data_path, low_memory=False)
+    df = df[df['type']=='quantile']
+    df.drop(['forecast_date'], axis=1, inplace=True)
+    df.columns = ['target', 'date', 'location', 'type', 'quantile', 'value']
+    df.drop(['type'], axis=1, inplace=True)
+
+    df_c = df[df['target'].str.contains('inc case')].copy()
+    df_c = df_c[df_c['location'] == 'US']
+    df_c['daily_reported_cases'] = df_c['value'] 
+    df_c.drop(['value','target'], axis=1, inplace=True) #,'target'
+    #df_c
+
+    df_d = df[df['target'].str.contains('inc death')].copy()
+    df_d = df_d[df_d['location'] == 'US']
+    df_d['daily_deaths'] = df_d['value'] 
+    df_d.drop(['value','target'], axis=1, inplace=True) #,'target'
+    #df_d
+
+    df_h = df[df['target'].str.contains('inc hosp')].copy()
+    df_h = df_h[df_h['location'] == 'US']
+    df_h['daily_hospitalizations'] = df_h['value'] 
+    df_h.drop(['value','target'], axis=1, inplace=True) #,'target'
+    #df_h
+
+    df2 = pd.merge(df_c, df_d, left_on=['date','quantile'], right_on=['date','quantile'])
+    df2 = pd.merge(df2, df_h, left_on=['date','quantile'], right_on = ['date','quantile'])
+    df2.drop(['location_x','location_y'], axis=1,inplace=True)
+
+    df2 = df2[['date','location','quantile','daily_reported_cases','daily_deaths','daily_hospitalizations']]
+    df2.columns = ['date','adm1','quantile','daily_reported_cases','daily_deaths','daily_hospitalizations']
+    df2['model'] = 'Bucky-Forecast'
+    df2['dt'] = pd.to_datetime(df2['date'], format='%Y-%m-%d')
+    df2['adm1'] = -1
+    df3 = df2[df2['quantile'].isin([-1,.01,.2,.25,.45,.55,.75,.8,.5,.99])]
+    return df3
+
+
+
 def show_paths():
     print('today: ', today_str)
     print('prior monday: ', monday_str)
